@@ -1,0 +1,29 @@
+html {
+
+}
+
+body {
+    background-color: black;
+}
+
+.header {
+    width: 100%; /* Во всю ширину */
+    height: 38px; /* Примерно 1 см на десктопе (37.8px ≈ 1cm) */
+    background-color: #333; /* Тёмный фон для контраста */
+    color: white; /* Белый текст */
+    display: flex; /* Гибкое размещение элементов */
+    justify-content: space-between; /* Распределяет логотип и меню */
+    align-items: center; /* Выравнивает по центру вертикально */
+    padding: 0 20px; /* Небольшие отступы внутри */
+    box-sizing: border-box; /* Учитывает padding в ширине */
+    border: 1px solid lightgray; /* Бледно-серый борт по всему периметру */
+}
+
+h1 {
+    display: flex;
+    justify-content: center;
+    color: white;  /* Или color: #ffffff; */
+}
+.main {
+    
+}
