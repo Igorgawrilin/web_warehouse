@@ -27,3 +27,26 @@ h1 {
 .main {
     
 }
+
+.Warehouse {
+    
+}
+#targetContainer {
+    margin-top: 20px;
+    border: 1px solid #ccc; /* Лёгкая рамка для контейнера */
+    padding: 10px;
+}
+
+.new-div {
+    width: 200px; /* Ширина */
+    height: 100px; /* Высота */
+    background-color: lightblue; /* Фон */
+    border: 2px solid #333; /* Рамка */
+    margin: 10px 0; /* Отступы между div */
+    padding: 10px; /* Внутренние отступы */
+    color: white; /* Цвет текста */
+    font-size: 14px; /* Размер шрифта */
+    display: flex; /* Для центрирования текста */
+    align-items: center; /* Выравнивание по центру */
+    justify-content: center; /* Текст по центру */
+}
