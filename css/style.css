@@ -50,3 +50,8 @@ h1 {
     align-items: center; /* Выравнивание по центру */
     justify-content: center; /* Текст по центру */
 }
+.my-div.delete-mode {
+    border: 2px solid red;
+    cursor: pointer;
+    background-color: #ffe6e6;
+}
