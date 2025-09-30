@@ -55,3 +55,24 @@ h1 {
     cursor: pointer;
     background-color: #ffe6e6;
 }
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Или другая высота контейнера */
+}
+
+.my-div {
+    background-color: aliceblue;
+}
+
+.shelves-container {
+    flex: 1; /* Занимает всю оставшуюся высоту */
+    border: 1px solid #ccc; /* Для видимости */
+    overflow-y: auto; /* Скролл, если много полок */
+    /* height: 20px; */
+}
+
+.shelves-container .my-div { /* Полки внутри контейнера */
+    /* Стили аналогично стеллажам, но можно подкорректировать */
+}
+
