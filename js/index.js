@@ -1,6 +1,9 @@
 // Глобальная переменная для отслеживания выбранного стеллажа
 let selectedShelving = null;
 
+// Глобальная переменная для режима удаления полок
+let isDeleteShelfMode = false;
+
 // Ищем кнопку
 const button = document.getElementById('creating_shelving_b');
 
@@ -30,8 +33,8 @@ if (button) {
             newDiv.appendChild(btn);
         }
 
-        // Кнопка 1: Переименование стеллажа (вторая кнопка)
-        const renameBtn = newDiv.querySelector('button:nth-child(2)');
+        // Кнопка 1: Переименование стеллажа (вторая дочерний элемент, поскольку span - первый)
+        const renameBtn = newDiv.children[1];
         renameBtn.title = 'Переименовать стеллаж';
         renameBtn.addEventListener('click', () => {
             const oldName = nameSpan.textContent;
@@ -47,35 +50,152 @@ if (button) {
             }
         });
 
-        // Кнопка 2: Создание полки (третья кнопка)
-        const createShelfBtn = newDiv.querySelector('button:nth-child(3)');
+        // Кнопка 2: Создание полки (третий дочерний элемент)
+        const createShelfBtn = newDiv.children[2];
         createShelfBtn.title = 'Создать полку';
         createShelfBtn.addEventListener('click', () => {
-            const shelfName = nameSpan.textContent;
-            const shelfNamePrompt = prompt('Введите имя полки:');
-            if (shelfNamePrompt && shelfNamePrompt.trim()) {
+            const shelfName = prompt('Как назвать полку?');
+            if (!shelfName || shelfName.trim() === '') {
+                console.log('Создание полки отменено или пустое название!');
+                return;
+            }
+            const trimmedShelfName = shelfName.trim();
+
+            // Если стеллаж не выбран, выбираем его (разворачиваем)
+            if (selectedShelving !== newDiv) {
+                const container = document.getElementById('creating_shelving');
+                const allShelvings = container.querySelectorAll('.my-div:not(.shelves-container .my-div)');
+                allShelvings.forEach(div => div.style.display = 'none');
+                container.insertBefore(newDiv, container.firstChild);
+                newDiv.style.display = 'block';
+
+                let shelvesContainer = container.querySelector('.shelves-container');
+                if (!shelvesContainer) {
+                    shelvesContainer = document.createElement('div');
+                    shelvesContainer.className = 'shelves-container';
+                    container.appendChild(shelvesContainer);
+                } else {
+                    shelvesContainer.innerHTML = '';
+                }
+
+                loadShelvesForShelving(nameSpan.textContent, shelvesContainer);
+                selectedShelving = newDiv;
+            }
+
+            // Добавляем полку в DOM
+            const shelvesContainer = document.querySelector('.shelves-container');
+            if (shelvesContainer) {
                 const newShelfDiv = document.createElement('div');
                 newShelfDiv.className = 'my-div';
 
                 const shelfSpan = document.createElement('span');
-                shelfSpan.textContent = shelfNamePrompt.trim();
+                shelfSpan.textContent = trimmedShelfName;
                 newShelfDiv.appendChild(shelfSpan);
 
+                // Создаём 3 кнопки для полки
                 for (let i = 0; i < 3; i++) {
                     const btn = document.createElement('button');
                     btn.textContent = '';
                     newShelfDiv.appendChild(btn);
                 }
 
-                const shelvesContainer = document.querySelector('.shelves-container');
-                if (shelvesContainer) {
-                    shelvesContainer.appendChild(newShelfDiv);
+                // Кнопка 1: Удаление полки (вторая дочерний элемент)
+                const deleteShelfBtn = newShelfDiv.children[1];
+                deleteShelfBtn.title = 'Удалить полку';
+                deleteShelfBtn.addEventListener('click', () => {
+                    showConfirm(
+                        `Вы хотите удалить полку: "${trimmedShelfName}"?`,
+                        () => {
+                            newShelfDiv.remove();
+                            // Обновляем localStorage
+                            let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                            if (shelvesData[nameSpan.textContent]) {
+                                const index = shelvesData[nameSpan.textContent].indexOf(trimmedShelfName);
+                                if (index !== -1) {
+                                    shelvesData[nameSpan.textContent].splice(index, 1);
+                                    localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                                }
+                            }
+                            console.log(`Полка "${trimmedShelfName}" удалена`);
+                        },
+                        () => {
+                            console.log(`Удаление полки "${trimmedShelfName}" отменено`);
+                        }
+                    );
+                });
+
+                // Кнопка 2: Переименование полки (третий дочерний элемент)
+                const renameShelfBtn = newShelfDiv.children[2];
+                renameShelfBtn.title = 'Переименовать полку';
+                renameShelfBtn.addEventListener('click', () => {
+                    const oldName = shelfSpan.textContent;
+                    const newName = prompt('Введите новое имя полки:', oldName);
+                    if (newName && newName.trim() && newName.trim() !== oldName) {
+                        shelfSpan.textContent = newName.trim();
+                        // Обновляем localStorage
+                        let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                        if (shelvesData[nameSpan.textContent]) {
+                            const index = shelvesData[nameSpan.textContent].indexOf(oldName);
+                            if (index !== -1) {
+                                shelvesData[nameSpan.textContent][index] = newName.trim();
+                                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                            }
+                        }
+                    }
+                });
+
+                shelvesContainer.appendChild(newShelfDiv);
+
+                // Сохраняем в localStorage
+                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                if (!shelvesData[nameSpan.textContent]) {
+                    shelvesData[nameSpan.textContent] = [];
+                }
+                shelvesData[nameSpan.textContent].push(trimmedShelfName);
+                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+            }
+        });
+
+        // Кнопка 3: Режим удаления полок (четвертый дочерний элемент)
+        const deleteModeBtn = newDiv.children[3];
+        deleteModeBtn.title = 'Режим удаления полок';
+        deleteModeBtn.addEventListener('click', () => {
+            // Переключаем режим удаления полок
+            isDeleteShelfMode = !isDeleteShelfMode;
+
+            // Если стеллаж не выбран, выбираем его (разворачиваем)
+            if (selectedShelving !== newDiv) {
+                const container = document.getElementById('creating_shelving');
+                const allShelvings = container.querySelectorAll('.my-div:not(.shelves-container .my-div)');
+                allShelvings.forEach(div => div.style.display = 'none');
+                container.insertBefore(newDiv, container.firstChild);
+                newDiv.style.display = 'block';
+
+                let shelvesContainer = container.querySelector('.shelves-container');
+                if (!shelvesContainer) {
+                    shelvesContainer = document.createElement('div');
+                    shelvesContainer.className = 'shelves-container';
+                    container.appendChild(shelvesContainer);
+                } else {
+                    shelvesContainer.innerHTML = '';
                 }
 
-                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
-                if (!shelvesData[shelfName]) shelvesData[shelfName] = [];
-                shelvesData[shelfName].push(shelfNamePrompt.trim());
-                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                loadShelvesForShelving(nameSpan.textContent, shelvesContainer);
+                selectedShelving = newDiv;
+            }
+
+            // Обновляем видимость режима
+            const shelves = document.querySelectorAll('.shelves-container .my-div');
+            shelves.forEach(shelf => {
+                shelf.classList.toggle('delete-shelf-mode', isDeleteShelfMode);
+            });
+
+            if (isDeleteShelfMode) {
+                deleteModeBtn.title = 'Выключить режим удаления полок';
+                console.log('Режим удаления полок включен');
+            } else {
+                deleteModeBtn.title = 'Режим удаления полок';
+                console.log('Режим удаления полок выключен');
             }
         });
 
@@ -94,6 +214,7 @@ if (button) {
                     shelvesContainer.innerHTML = ''; // Очищаем контейнер полок
                 }
                 selectedShelving = null;
+                isDeleteShelfMode = false; // Сбрасываем режим удаления полок при сбросе выбора
             } else {
                 // Первый клик: скрываем все, показываем выбранный
                 allShelvings.forEach(div => div.style.display = 'none');
@@ -243,6 +364,39 @@ container.addEventListener('click', event => {
     }
 });
 
+// Обработчик клика по полке в режиме удаления
+container.addEventListener('click', event => {
+    if (!isDeleteShelfMode) return;
+
+    if (event.target.classList.contains('my-div') && event.target.parentElement.classList.contains('shelves-container')) {
+        const shelf = event.target;
+        const shelfName = shelf.querySelector('span').textContent || 'Без названия';
+        const shelvingName = selectedShelving ? selectedShelving.querySelector('span').textContent : '';
+
+        showConfirm(
+            `Вы хотите удалить полку: "${shelfName}" из стеллажа "${shelvingName}"?`,
+            () => {
+                // Да - удаляем
+                shelf.remove();
+                // Обновляем localStorage
+                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                if (shelvesData[shelvingName]) {
+                    const index = shelvesData[shelvingName].indexOf(shelfName);
+                    if (index !== -1) {
+                        shelvesData[shelvingName].splice(index, 1);
+                        localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                    }
+                }
+                console.log(`Полка "${shelfName}" удалена из стеллажа "${shelvingName}"`);
+            },
+            () => {
+                // Нет - ничего не делаем
+                console.log(`Удаление полки "${shelfName}" отменено`);
+            }
+        );
+    }
+});
+
 // Сохранение стеллажей
 function saveShelving() {
     const shelvings = document.querySelectorAll('.my-div:not(.shelves-container .my-div)');
@@ -263,11 +417,57 @@ function loadShelvesForShelving(shelvingName, shelvesContainer) {
         shelfSpan.textContent = shelfName;
         newShelfDiv.appendChild(shelfSpan);
 
+        // Создаём 3 кнопки для полки
         for (let i = 0; i < 3; i++) {
             const btn = document.createElement('button');
             btn.textContent = '';
             newShelfDiv.appendChild(btn);
         }
+
+        // Кнопка 1: Удаление полки (вторая дочерний элемент)
+        const deleteShelfBtn = newShelfDiv.children[1];
+        deleteShelfBtn.title = 'Удалить полку';
+        deleteShelfBtn.addEventListener('click', () => {
+            showConfirm(
+                `Вы хотите удалить полку: "${shelfName}"?`,
+                () => {
+                    newShelfDiv.remove();
+                    // Обновляем localStorage
+                    let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                    if (shelvesData[shelvingName]) {
+                        const index = shelvesData[shelvingName].indexOf(shelfName);
+                        if (index !== -1) {
+                            shelvesData[shelvingName].splice(index, 1);
+                            localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                        }
+                    }
+                    console.log(`Полка "${shelfName}" удалена`);
+                },
+                () => {
+                    console.log(`Удаление полки "${shelfName}" отменено`);
+                }
+            );
+        });
+
+        // Кнопка 2: Переименование полки (третий дочерний элемент)
+        const renameShelfBtn = newShelfDiv.children[2];
+        renameShelfBtn.title = 'Переименовать полку';
+        renameShelfBtn.addEventListener('click', () => {
+            const oldName = shelfSpan.textContent;
+            const newName = prompt('Введите новое имя полки:', oldName);
+            if (newName && newName.trim() && newName.trim() !== oldName) {
+                shelfSpan.textContent = newName.trim();
+                // Обновляем localStorage
+                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                if (shelvesData[shelvingName]) {
+                    const index = shelvesData[shelvingName].indexOf(oldName);
+                    if (index !== -1) {
+                        shelvesData[shelvingName][index] = newName.trim();
+                        localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                    }
+                }
+            }
+        });
 
         shelvesContainer.appendChild(newShelfDiv);
     });
@@ -294,8 +494,8 @@ function loadShelving() {
             newDiv.appendChild(btn);
         }
 
-        // Кнопка 1: Переименование стеллажа (вторая кнопка)
-        const renameBtn = newDiv.querySelector('button:nth-child(2)');
+        // Кнопка 1: Переименование стеллажа (вторая дочерний элемент)
+        const renameBtn = newDiv.children[1];
         renameBtn.title = 'Переименовать стеллаж';
         renameBtn.addEventListener('click', () => {
             const oldName = nameSpan.textContent;
@@ -311,35 +511,152 @@ function loadShelving() {
             }
         });
 
-        // Кнопка 2: Создание полки (третья кнопка)
-        const createShelfBtn = newDiv.querySelector('button:nth-child(3)');
+        // Кнопка 2: Создание полки (третий дочерний элемент)
+        const createShelfBtn = newDiv.children[2];
         createShelfBtn.title = 'Создать полку';
         createShelfBtn.addEventListener('click', () => {
-            const shelfName = nameSpan.textContent;
-            const shelfNamePrompt = prompt('Введите имя полки:');
-            if (shelfNamePrompt && shelfNamePrompt.trim()) {
+            const shelfName = prompt('Как назвать полку?');
+            if (!shelfName || shelfName.trim() === '') {
+                console.log('Создание полки отменено или пустое название!');
+                return;
+            }
+            const trimmedShelfName = shelfName.trim();
+
+            // Если стеллаж не выбран, выбираем его (разворачиваем)
+            if (selectedShelving !== newDiv) {
+                const container = document.getElementById('creating_shelving');
+                const allShelvings = container.querySelectorAll('.my-div:not(.shelves-container .my-div)');
+                allShelvings.forEach(div => div.style.display = 'none');
+                container.insertBefore(newDiv, container.firstChild);
+                newDiv.style.display = 'block';
+
+                let shelvesContainer = container.querySelector('.shelves-container');
+                if (!shelvesContainer) {
+                    shelvesContainer = document.createElement('div');
+                    shelvesContainer.className = 'shelves-container';
+                    container.appendChild(shelvesContainer);
+                } else {
+                    shelvesContainer.innerHTML = '';
+                }
+
+                loadShelvesForShelving(nameSpan.textContent, shelvesContainer);
+                selectedShelving = newDiv;
+            }
+
+            // Добавляем полку в DOM
+            const shelvesContainer = document.querySelector('.shelves-container');
+            if (shelvesContainer) {
                 const newShelfDiv = document.createElement('div');
                 newShelfDiv.className = 'my-div';
 
                 const shelfSpan = document.createElement('span');
-                shelfSpan.textContent = shelfNamePrompt.trim();
+                shelfSpan.textContent = trimmedShelfName;
                 newShelfDiv.appendChild(shelfSpan);
 
+                // Создаём 3 кнопки для полки
                 for (let i = 0; i < 3; i++) {
                     const btn = document.createElement('button');
                     btn.textContent = '';
                     newShelfDiv.appendChild(btn);
                 }
 
-                const shelvesContainer = document.querySelector('.shelves-container');
-                if (shelvesContainer) {
-                    shelvesContainer.appendChild(newShelfDiv);
+                // Кнопка 1: Удаление полки (вторая дочерний элемент)
+                const deleteShelfBtn = newShelfDiv.children[1];
+                deleteShelfBtn.title = 'Удалить полку';
+                deleteShelfBtn.addEventListener('click', () => {
+                    showConfirm(
+                        `Вы хотите удалить полку: "${trimmedShelfName}"?`,
+                        () => {
+                            newShelfDiv.remove();
+                            // Обновляем localStorage
+                            let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                            if (shelvesData[nameSpan.textContent]) {
+                                const index = shelvesData[nameSpan.textContent].indexOf(trimmedShelfName);
+                                if (index !== -1) {
+                                    shelvesData[nameSpan.textContent].splice(index, 1);
+                                    localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                                }
+                            }
+                            console.log(`Полка "${trimmedShelfName}" удалена`);
+                        },
+                        () => {
+                            console.log(`Удаление полки "${trimmedShelfName}" отменено`);
+                        }
+                    );
+                });
+
+                // Кнопка 2: Переименование полки (третий дочерний элемент)
+                const renameShelfBtn = newShelfDiv.children[2];
+                renameShelfBtn.title = 'Переименовать полку';
+                renameShelfBtn.addEventListener('click', () => {
+                    const oldName = shelfSpan.textContent;
+                    const newName = prompt('Введите новое имя полки:', oldName);
+                    if (newName && newName.trim() && newName.trim() !== oldName) {
+                        shelfSpan.textContent = newName.trim();
+                        // Обновляем localStorage
+                        let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                        if (shelvesData[nameSpan.textContent]) {
+                            const index = shelvesData[nameSpan.textContent].indexOf(oldName);
+                            if (index !== -1) {
+                                shelvesData[nameSpan.textContent][index] = newName.trim();
+                                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                            }
+                        }
+                    }
+                });
+
+                shelvesContainer.appendChild(newShelfDiv);
+
+                // Сохраняем в localStorage
+                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
+                if (!shelvesData[nameSpan.textContent]) {
+                    shelvesData[nameSpan.textContent] = [];
+                }
+                shelvesData[nameSpan.textContent].push(trimmedShelfName);
+                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+            }
+        });
+
+        // Кнопка 3: Режим удаления полок (четвертый дочерний элемент)
+        const deleteModeBtn = newDiv.children[3];
+        deleteModeBtn.title = 'Режим удаления полок';
+        deleteModeBtn.addEventListener('click', () => {
+            // Переключаем режим удаления полок
+            isDeleteShelfMode = !isDeleteShelfMode;
+
+            // Если стеллаж не выбран, выбираем его (разворачиваем)
+            if (selectedShelving !== newDiv) {
+                const container = document.getElementById('creating_shelving');
+                const allShelvings = container.querySelectorAll('.my-div:not(.shelves-container .my-div)');
+                allShelvings.forEach(div => div.style.display = 'none');
+                container.insertBefore(newDiv, container.firstChild);
+                newDiv.style.display = 'block';
+
+                let shelvesContainer = container.querySelector('.shelves-container');
+                if (!shelvesContainer) {
+                    shelvesContainer = document.createElement('div');
+                    shelvesContainer.className = 'shelves-container';
+                    container.appendChild(shelvesContainer);
+                } else {
+                    shelvesContainer.innerHTML = '';
                 }
 
-                let shelvesData = JSON.parse(localStorage.getItem('shelves') || '{}');
-                if (!shelvesData[shelfName]) shelvesData[shelfName] = [];
-                shelvesData[shelfName].push(shelfNamePrompt.trim());
-                localStorage.setItem('shelves', JSON.stringify(shelvesData));
+                loadShelvesForShelving(nameSpan.textContent, shelvesContainer);
+                selectedShelving = newDiv;
+            }
+
+            // Обновляем видимость режима
+            const shelves = document.querySelectorAll('.shelves-container .my-div');
+            shelves.forEach(shelf => {
+                shelf.classList.toggle('delete-shelf-mode', isDeleteShelfMode);
+            });
+
+            if (isDeleteShelfMode) {
+                deleteModeBtn.title = 'Выключить режим удаления полок';
+                console.log('Режим удаления полок включен');
+            } else {
+                deleteModeBtn.title = 'Режим удаления полок';
+                console.log('Режим удаления полок выключен');
             }
         });
 
@@ -358,6 +675,7 @@ function loadShelving() {
                     shelvesContainer.innerHTML = ''; // Очищаем контейнер полок
                 }
                 selectedShelving = null;
+                isDeleteShelfMode = false; // Сбрасываем режим удаления полок при сбросе выбора
             } else {
                 // Первый клик: скрываем все, показываем выбранный
                 allShelvings.forEach(div => div.style.display = 'none');
