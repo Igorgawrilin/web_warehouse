@@ -1,33 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Warehouse</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>ЧИ ШОООО! СТЕЛЛАЖИИИИ?</title>
+    <link rel="stylesheet" href="css/style.css">  <!-- Подключаем CSS -->
 </head>
 <body>
     <header>
-        <h1>Web Warehouse</h1>
+        <h1>ЧИ ШОООО! СТЕЛЛАЖИИИИ?</h1>
     </header>
     
     <main>
-        <div class="Warehouse"><!--здесь будет основное окно -->
-            <div class="control_panel">
-                <button id="creating_shelving_b">
-                O
-                </button>
-                <button id="delete_shelving_b">
-                Х
-                </button>
-            </div>
-            <div id="creating_shelving">
-                
-            </div>  
-        </div>
-    </main>
 
-    <footer></footer>
+        <div id="spare"></div>
+
+        <div id="warehouse-container">
+            <!-- Здесь JS добавит кнопку и контейнер стеллажей -->
+        </div>
+
+        <div id="search">
+            <input type="text" id="searchInput" placeholder="Введите название предмета">
+            <button id="searchBtn">Поиск</button>
+        </div>
+
+    </main>
+    
+    <footer>
+        <!-- Здесь можно добавить копирайт, ссылки или другие элементы -->
+    </footer>
+
+    <script src="js/index.js"></script>
 </body>
 </html>
-<script src="js/index.js" defer></script>

@@ -1,52 +1,222 @@
-html {
-
+/* Базовые стили для демонстрации */
+.my-div {
+    border: 1px solid #ccc;
+    margin: 5px;
+    padding: 5px;
 }
 
+.shelves-container {
+    margin-left: 20px;
+}
+
+.items-container {
+    margin-left: 40px;
+}
+
+button {
+    margin: 2px;
+}
+/* Базовые стили для body и main */
 body {
-    background-color: black;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
 }
 
-.header {
-    width: 100%; /* Во всю ширину */
-    height: 38px; /* Примерно 1 см на десктопе (37.8px ≈ 1cm) */
-    background-color: #333; /* Тёмный фон для контраста */
-    color: white; /* Белый текст */
-    display: flex; /* Гибкое размещение элементов */
-    justify-content: space-between; /* Распределяет логотип и меню */
-    align-items: center; /* Выравнивает по центру вертикально */
-    padding: 0 20px; /* Небольшие отступы внутри */
-    box-sizing: border-box; /* Учитывает padding в ширине */
-    border: 1px solid lightgray; /* Бледно-серый борт по всему периметру */
+main {
+    display: flex; /* Делаем main flex-контейнером для горизонтального распределения */
+    width: 100%; /* Занимает всю ширину viewport */
+    min-height: 100vh; /* Минимальная высота на весь экран */
+    gap: 10px; /* Небольшой отступ между элементами для красоты */
+    padding: 20px; /* Отступы по краям main */
+    box-sizing: border-box; /* Учитываем padding в ширине */
 }
 
-h1 {
-    display: flex;
-    justify-content: center;
-    color: white;  /* Или color: #ffffff; */
-}
-.main {
-    
-}
-
-.Warehouse {
-    
-}
-#targetContainer {
-    margin-top: 20px;
-    border: 1px solid #ccc; /* Лёгкая рамка для контейнера */
+/* Стили для spare и search: по 20% ширины */
+#spare,
+#search {
+    flex: 0 0 20%; /* Не растягивается, не сжимается, базовая ширина 20% */
+    background-color: #e0e0e0; /* Временный фон для видимости; замените на нужный */
     padding: 10px;
+    border-radius: 5px;
+    box-sizing: border-box; /* Учитываем padding в ширине */
 }
 
-.new-div {
-    width: 200px; /* Ширина */
-    height: 100px; /* Высота */
-    background-color: lightblue; /* Фон */
-    border: 2px solid #333; /* Рамка */
-    margin: 10px 0; /* Отступы между div */
-    padding: 10px; /* Внутренние отступы */
-    color: white; /* Цвет текста */
-    font-size: 14px; /* Размер шрифта */
-    display: flex; /* Для центрирования текста */
-    align-items: center; /* Выравнивание по центру */
-    justify-content: center; /* Текст по центру */
+/* Warehouse-container: занимает оставшееся пространство (60%) */
+#warehouse-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1; /* Растягивается на оставшуюся ширину (100% - 20% - 20% = 60%) */
+    background-color: #fff; /* Белый фон для основного контента */
+    padding: 10px;
+    border-radius: 5px;
+    box-sizing: border-box;
+    overflow-y: auto; /* Если контент стеллажей переполнит, добавит скролл */
+}
+#warehouse-container button{
+    order: -1;
+}
+/* Дополнительные стили для ваших элементов (из JS) */
+.my-div {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Отступ между span и кнопками/инпутами */
+}
+
+.my-div span {
+    flex: 1; /* Span занимает основное место */
+    font-weight: bold;
+}
+
+.my-div button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    min-width: 30px; /* Минимальная ширина кнопок */
+}
+
+.my-div button:hover {
+    background-color: #0056b3;
+}
+
+.items-container {
+    margin-top: 10px;
+    padding-left: 20px; /* Отступ для вложенных предметов */
+    border-left: 2px solid #ccc; /* Визуальный индикатор вложенности */
+}
+
+.shelves-container {
+    margin-top: 10px;
+    padding-left: 20px;
+    border-left: 2px solid #ccc;
+}
+
+/* Адаптивность: на мобильных устройствах stack'аем вертикально */
+@media (max-width: 768px) {
+    main {
+        flex-direction: column; /* Вертикальный стек */
+        gap: 15px;
+    }
+    
+    #spare,
+    #search,
+    #warehouse-container {
+        flex: none; /* Сбрасываем ширины */
+        width: 100%; /* Каждый занимает 100% ширины */
+    }
+}
+
+/* Стили для header и footer (если нужно) */
+header h1 {
+    text-align: center;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    background-color: #007bff;
+    color: white;
+}
+
+footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #333;
+    color: white;
+    margin-top: 20px;
+}
+/* Стили для модального окна (добавьте в конец style.css) */
+.modal {
+    display: none; /* Скрыто по умолчанию */
+    position: fixed; /* Фиксировано относительно viewport */
+    z-index: 1000; /* Поверх всего */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Полупрозрачный черный overlay */
+    animation: fadeIn 0.3s; /* Плавное появление */
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 15% auto; /* Центрирование по вертикали */
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 400px; /* Максимальная ширина */
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    animation: slideIn 0.3s; /* Плавное появление контента */
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.modal-content p {
+    margin: 10px 0;
+    font-size: 16px;
+}
+
+.close-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 15px;
+}
+
+.close-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Анимации для плавности */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Улучшение для input и кнопки в #search (если нужно) */
+#searchInput {
+    width: 70%;
+    padding: 8px;
+    margin-right: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+#searchBtn {
+    padding: 8px 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#search input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+#search button:hover {
+    background-color: #0056b3;
 }
