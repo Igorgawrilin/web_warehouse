@@ -1,293 +1,276 @@
+// Полный код JavaScript для складского приложения (js/script.js)
+// Включает весь функционал: управление складом (стеллажи → полки → предметы), LocalStorage, и исправленный поиск.
+// Теперь поиск собирает ВСЕ места, где найден предмет (если он есть на нескольких полках), и отображает их в модальном окне.
+// Если предмет не найден нигде, показывает сообщение "Предмет не найден".
+
 // Глобальные переменные
-let shelvingsData = JSON.parse(localStorage.getItem('shelvings') || '{}');
-let itemsData = JSON.parse(localStorage.getItem('items') || '{}');
+let warehouseData = JSON.parse(localStorage.getItem('warehouse')) || { shelves: {} };
 
-// Миграция старых данных: если предметы сохранены как массивы строк, превращаем в объекты с quantity=1
-function migrateItemsData() {
-    for (let key in itemsData) {
-        if (Array.isArray(itemsData[key]) && itemsData[key].length > 0 && typeof itemsData[key][0] === 'string') {
-            itemsData[key] = itemsData[key].map(name => ({ name, quantity: 1 }));
-        }
-    }
-    localStorage.setItem('items', JSON.stringify(itemsData));
-}
-migrateItemsData(); // Вызываем при загрузке
+// Функция загрузки и отображения склада
+function loadWarehouse() {
+    const container = document.getElementById('warehouse-container');
+    container.innerHTML = ''; // Очищаем контейнер
 
-// Функция для создания элементов стеллажа
-function createShelvingElement(name) {
-    const newShelvingDiv = document.createElement('div');
-    newShelvingDiv.className = 'my-div';
+    for (const shelfName in warehouseData.shelves) {
+        const shelfDiv = document.createElement('div');
+        shelfDiv.className = 'shelf';
+        shelfDiv.innerHTML = `<h3>${shelfName}</h3><button onclick="deleteShelf('${shelfName}')">Удалить стеллаж</button>`;
 
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = name;
-    newShelvingDiv.appendChild(nameSpan);
+        const shelfShelves = warehouseData.shelves[shelfName].shelves || {};
+        for (const subShelfName in shelfShelves) {
+            const subShelfDiv = document.createElement('div');
+            subShelfDiv.className = 'sub-shelf';
+            subShelfDiv.innerHTML = `<h4>${subShelfName}</h4><button onclick="deleteSubShelf('${shelfName}', '${subShelfName}')">Удалить полку</button>`;
 
-    for (let i = 0; i < 2; i++) {
-        const btn = document.createElement('button');
-        btn.textContent = '';
-        newShelvingDiv.appendChild(btn);
-    }
-
-    const deleteBtn = newShelvingDiv.children[1];
-    deleteBtn.title = 'Удалить стеллаж';
-    deleteBtn.addEventListener('click', () => {
-        showConfirm(
-            `Вы хотите удалить стеллаж: "${name}"?`,
-            () => {
-                delete shelvingsData[name];
-                delete itemsData[name]; // Удаляем связанные предметы
-                localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
-                localStorage.setItem('items', JSON.stringify(itemsData));
-                newShelvingDiv.remove();
-                console.log(`Стеллаж "${name}" удалён`);
-            },
-            () => {
-                console.log(`Удаление стеллажа "${name}" отменено`);
+            const items = shelfShelves[subShelfName].items || {};
+            for (const itemName in items) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item';
+                itemDiv.innerHTML = `
+                    <span>${itemName}: ${items[itemName]}</span>
+                    <button onclick="editItem('${shelfName}', '${subShelfName}', '${itemName}')">Изменить</button>
+                    <button onclick="deleteItem('${shelfName}', '${subShelfName}', '${itemName}')">Удалить</button>
+                `;
+                subShelfDiv.appendChild(itemDiv);
             }
-        );
-    });
 
-    const renameBtn = newShelvingDiv.children[2];
-    renameBtn.title = 'Переименовать стеллаж';
-    renameBtn.addEventListener('click', () => {
-        const oldName = name;
-        const newName = prompt('Введите новое имя стеллажа:', oldName);
-        if (newName && newName.trim() && newName.trim() !== oldName) {
-            nameSpan.textContent = newName.trim();
-            shelvingsData[newName.trim()] = shelvingsData[oldName];
-            delete shelvingsData[oldName];
-            localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
+            // Кнопка добавления предмета
+            const addItemBtn = document.createElement('button');
+            addItemBtn.textContent = 'Добавить предмет';
+            addItemBtn.onclick = () => addItem(shelfName, subShelfName);
+            subShelfDiv.appendChild(addItemBtn);
+
+            shelfDiv.appendChild(subShelfDiv);
         }
-    });
 
-    return newShelvingDiv;
+        // Кнопка добавления полки
+        const addSubShelfBtn = document.createElement('button');
+        addSubShelfBtn.textContent = 'Добавить полку';
+        addSubShelfBtn.onclick = () => addSubShelf(shelfName);
+        shelfDiv.appendChild(addSubShelfBtn);
+
+        container.appendChild(shelfDiv);
+    }
+
+    // Кнопка добавления стеллажа
+    const addShelfBtn = document.createElement('button');
+    addShelfBtn.textContent = 'Добавить стеллаж';
+    addShelfBtn.onclick = addShelf;
+    container.appendChild(addShelfBtn);
+
+    saveWarehouse(); // Сохраняем после загрузки (на случай изменений)
 }
 
-// Функция для создания элементов полки
-function createShelfElement(shelvingName, shelfName) {
-    const newShelfDiv = document.createElement('div');
-    newShelfDiv.className = 'my-div';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = shelfName;
-    newShelfDiv.appendChild(nameSpan);
-
-    for (let i = 0; i < 3; i++) {
-        const btn = document.createElement('button');
-        btn.textContent = '';
-        newShelfDiv.appendChild(btn);
-    }
-
-    const itemsContainer = document.createElement('div');
-    itemsContainer.className = 'items-container';
-    newShelfDiv.appendChild(itemsContainer);
-
-    loadItemsForShelf(shelvingName, shelfName, itemsContainer);
-
-    const deleteBtn = newShelfDiv.children[1];
-    deleteBtn.title = 'Удалить полку';
-    deleteBtn.addEventListener('click', () => {
-        showConfirm(
-            `Вы хотите удалить полку: "${shelfName}"?`,
-            () => {
-                delete shelvingsData[shelvingName][shelfName];
-                delete itemsData[`${shelvingName}:${shelfName}`];
-                localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
-                localStorage.setItem('items', JSON.stringify(itemsData));
-                newShelfDiv.remove();
-                console.log(`Полка "${shelfName}" удалена`);
-            },
-            () => {
-                console.log(`Удаление полки "${shelfName}" отменено`);
-            }
-        );
-    });
-
-    const renameBtn = newShelfDiv.children[2];
-    renameBtn.title = 'Переименовать полку';
-    renameBtn.addEventListener('click', () => {
-        const oldName = shelfName;
-        const newName = prompt('Введите новое имя полки:', oldName);
-        if (newName && newName.trim() && newName.trim() !== oldName) {
-            nameSpan.textContent = newName.trim();
-            shelvingsData[shelvingName][newName.trim()] = shelvingsData[shelvingName][oldName];
-            delete shelvingsData[shelvingName][oldName];
-            localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
-        }
-    });
-
-    const addItemBtn = newShelfDiv.children[3];
-    addItemBtn.title = 'Добавить предмет';
-    addItemBtn.addEventListener('click', () => {
-        const itemName = prompt('Как назвать предмет?');
-        if (!itemName || itemName.trim() === '') return;
-
-        let itemQuantity = prompt('Сколько штук? (число)', '1');
-        itemQuantity = parseInt(itemQuantity);
-        if (isNaN(itemQuantity) || itemQuantity < 0) itemQuantity = 1;
-
-        const newItemDiv = createItemElement(shelvingName, shelfName, itemName.trim(), itemQuantity);
-        itemsContainer.appendChild(newItemDiv);
-
-        const key = `${shelvingName}:${shelfName}`;
-        if (!itemsData[key]) itemsData[key] = [];
-        itemsData[key].push({ name: itemName.trim(), quantity: itemQuantity });
-        localStorage.setItem('items', JSON.stringify(itemsData));
-        console.log(`Предмет "${itemName.trim()}" добавлен с количеством ${itemQuantity}`);
-    });
-
-    return newShelfDiv;
+// Функция сохранения в LocalStorage
+function saveWarehouse() {
+    localStorage.setItem('warehouse', JSON.stringify(warehouseData));
 }
 
-// Функция для создания элементов предмета с количеством
-function createItemElement(shelvingName, shelfName, itemName, itemQuantity) {
-    const newItemDiv = document.createElement('div');
-    newItemDiv.className = 'my-div';
+// Функция добавления стеллажа
+function addShelf() {
+    const name = prompt('Введите название стеллажа:');
+    if (name && !warehouseData.shelves[name]) {
+        warehouseData.shelves[name] = { shelves: {} };
+        loadWarehouse();
+    } else {
+        alert('Стеллаж с таким именем уже существует или имя пустое.');
+    }
+}
 
-    const itemSpan = document.createElement('span');
-    itemSpan.textContent = itemName;
-    newItemDiv.appendChild(itemSpan);
+// Функция удаления стеллажа
+function deleteShelf(name) {
+    if (confirm(`Удалить стеллаж "${name}" и всё его содержимое?`)) {
+        delete warehouseData.shelves[name];
+        loadWarehouse();
+    }
+}
 
-    const quantityInput = document.createElement('input');
-    quantityInput.type = 'number';
-    quantityInput.min = '0';
-    quantityInput.value = itemQuantity;
-    quantityInput.style.width = '50px';
-    quantityInput.title = 'Количество';
-    newItemDiv.appendChild(quantityInput);
+// Функция добавления полки
+function addSubShelf(shelfName) {
+    const name = prompt('Введите название полки:');
+    if (name && !warehouseData.shelves[shelfName].shelves[name]) {
+        warehouseData.shelves[shelfName].shelves[name] = { items: {} };
+        loadWarehouse();
+    } else {
+        alert('Полка с таким именем уже существует или имя пустое.');
+    }
+}
 
-    for (let i = 0; i < 2; i++) {
-        const btn = document.createElement('button');
-        btn.textContent = '';
-        newItemDiv.appendChild(btn);
+// Функция удаления полки
+function deleteSubShelf(shelfName, subShelfName) {
+    if (confirm(`Удалить полку "${subShelfName}" и всё её содержимое?`)) {
+        delete warehouseData.shelves[shelfName].shelves[subShelfName];
+        loadWarehouse();
+    }
+}
+
+// Функция добавления предмета
+function addItem(shelfName, subShelfName) {
+    const name = prompt('Введите название предмета:');
+    const quantity = parseInt(prompt('Введите количество:'), 10);
+    if (name && quantity > 0 && !isNaN(quantity)) {
+        if (!warehouseData.shelves[shelfName].shelves[subShelfName].items[name]) {
+            warehouseData.shelves[shelfName].shelves[subShelfName].items[name] = quantity;
+            loadWarehouse();
+        } else {
+            alert('Предмет с таким именем уже существует.');
+        }
+    } else {
+        alert('Неверные данные.');
+    }
+}
+
+// Функция редактирования предмета
+function editItem(shelfName, subShelfName, itemName) {
+    const newQuantity = parseInt(prompt(`Введите новое количество для "${itemName}":`, warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName]), 10);
+    if (newQuantity > 0 && !isNaN(newQuantity)) {
+        warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName] = newQuantity;
+        loadWarehouse();
+    } else {
+        alert('Неверное количество.');
+    }
+}
+
+// Функция удаления предмета
+function deleteItem(shelfName, subShelfName, itemName) {
+    if (confirm(`Удалить предмет "${itemName}"?`)) {
+        delete warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName];
+        loadWarehouse();
+    }
+}
+
+// Функция поиска (исправленная: теперь находит ВСЕ места)
+function searchItem(itemName) {
+    if (!itemName.trim()) {
+        alert('Введите название предмета!');
+        return;
     }
 
-    quantityInput.addEventListener('change', () => {
-        let val = parseInt(quantityInput.value);
-        if (isNaN(val) || val < 0) val = 0;
-        const key = `${shelvingName}:${shelfName}`;
-        if (itemsData[key]) {
-            const itemObj = itemsData[key].find(i => i.name === itemName);
-            if (itemObj) {
-                itemObj.quantity = val;
-                localStorage.setItem('items', JSON.stringify(itemsData));
-                console.log(`Количество "${itemName}" обновлено: ${val}`);
-            }
-        }
-    });
+    let foundItems = []; // Массив для всех найденных предметов
 
-    const deleteItemBtn = newItemDiv.children[2];
-    deleteItemBtn.title = 'Удалить предмет';
-    deleteItemBtn.addEventListener('click', () => {
-        showConfirm(
-            `Вы хотите удалить предмет: "${itemName}"?`,
-            () => {
-                newItemDiv.remove();
-                const key = `${shelvingName}:${shelfName}`;
-                if (itemsData[key]) {
-                    const index = itemsData[key].findIndex(i => i.name === itemName);
-                    if (index !== -1) {
-                        itemsData[key].splice(index, 1);
-                        localStorage.setItem('items', JSON.stringify(itemsData));
+    // Рекурсивный поиск по стеллажам → полкам → предметам (собираем все совпадения)
+    function searchInShelves(obj, currentPath = '') {
+        for (const shelfName in obj) {
+            if (obj[shelfName].items) {
+                // Это полка с предметами
+                for (const itemNameInData in obj[shelfName].items) {
+                    if (itemNameInData.toLowerCase().includes(itemName.toLowerCase())) { // Частичное совпадение, нечувствительное к регистру
+                        foundItems.push({
+                            name: itemNameInData,
+                            quantity: obj[shelfName].items[itemNameInData],
+                            location: currentPath + ' → ' + shelfName
+                        });
+                        // НЕ останавливаем поиск — продолжаем искать все места
                     }
                 }
-                console.log(`Предмет "${itemName}" удалён`);
-            },
-            () => {
-                console.log(`Удаление предмета "${itemName}" отменено`);
-            }
-        );
-    });
-
-    const renameItemBtn = newItemDiv.children[3];
-    renameItemBtn.title = 'Переименовать предмет';
-    renameItemBtn.addEventListener('click', () => {
-        const oldName = itemName;
-        const newName = prompt('Введите новое имя предмета:', oldName);
-        if (newName && newName.trim() && newName.trim() !== oldName) {
-            itemSpan.textContent = newName.trim();
-            const key = `${shelvingName}:${shelfName}`;
-            if (itemsData[key]) {
-                const itemObj = itemsData[key].find(i => i.name === oldName);
-                if (itemObj) {
-                    itemObj.name = newName.trim();
-                    localStorage.setItem('items', JSON.stringify(itemsData));
-                }
+            } else if (obj[shelfName].shelves) {
+                // Это стеллаж с полками
+                const newPath = currentPath + (currentPath ? ' → ' : '') + shelfName;
+                searchInShelves(obj[shelfName].shelves, newPath); // Рекурсивно продолжаем
             }
         }
-    });
+    }
 
-    return newItemDiv;
+    // Запуск поиска (warehouseData.shelves — корень)
+    if (warehouseData.shelves) {
+        searchInShelves(warehouseData.shelves);
+    }
+
+    if (foundItems.length > 0) {
+        // Показываем модальное окно со списком всех найденных
+        showModal(foundItems);
+    } else {
+        // Не найден
+        showModal('Предмет не найден', '', 'Проверьте название и попробуйте снова.');
+    }
 }
 
-// Функция для загрузки предметов для полки
-function loadItemsForShelf(shelvingName, shelfName, itemsContainer) {
-    const key = `${shelvingName}:${shelfName}`;
-    const items = itemsData[key] || [];
+// Функция показа модального окна (обновленная: принимает массив или строку)
+function showModal(titleOrItems, quantity, location) {
+    let modal = document.getElementById('searchModal');
+    let modalTitle = document.getElementById('modalTitle');
+    let modalContent = document.getElementById('modalContent');
+    let modalCloseBtn = document.getElementById('modalCloseBtn');
 
-    itemsContainer.innerHTML = '';
+    if (!modal) {
+        // Создаем модальное, если его нет
+        createModal();
+        // После создания заново получаем ссылки на элементы
+        modal = document.getElementById('searchModal');
+        modalTitle = document.getElementById('modalTitle');
+        modalContent = document.getElementById('modalContent');
+        modalCloseBtn = document.getElementById('modalCloseBtn');
+    }
 
-    items.forEach(({ name, quantity }) => {
-        const itemEl = createItemElement(shelvingName, shelfName, name, quantity);
-        itemsContainer.appendChild(itemEl);
-    });
+    modalTitle.textContent = ''; // Сброс
+    modalContent.innerHTML = ''; // Сброс
+
+    if (Array.isArray(titleOrItems)) {
+        // Массив найденных предметов
+        modalTitle.textContent = 'Найденные предметы:';
+        const ul = document.createElement('ul');
+        titleOrItems.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${item.name}</strong> - Количество: ${item.quantity} - Расположение: ${item.location}`;
+            ul.appendChild(li);
+        });
+        modalContent.appendChild(ul);
+    } else {
+        // Сообщение об ошибке (строка)
+        modalTitle.textContent = titleOrItems;
+        modalContent.innerHTML = `<p>${location}</p>`;
+    }
+
+    modal.style.display = 'block'; // Показываем
 }
 
-// Функция для загрузки всех данных
-function loadData() {
-    const shelvingsContainer = document.getElementById('shelvingsContainer');
-    shelvingsContainer.innerHTML = '';
+// Функция создания модального HTML (обновленная: добавлен div для контента)
+function createModal() {
+    const modalHtml = `
+        <div id="searchModal" class="modal">
+            <div class="modal-content">
+                <h3 id="modalTitle"></h3>
+                <div id="modalContent"></div>
+                <button id="modalCloseBtn" class="close-btn" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml); // Добавляем в body
 
-    for (let shelvingName in shelvingsData) {
-        const shelvingEl = createShelvingElement(shelvingName);
-        shelvingsContainer.appendChild(shelvingEl);
-
-        const shelvesContainer = document.createElement('div');
-        shelvesContainer.className = 'shelves-container';
-        shelvingEl.appendChild(shelvesContainer);
-
-        for (let shelfName in shelvingsData[shelvingName]) {
-            const shelfEl = createShelfElement(shelvingName, shelfName);
-            shelvesContainer.appendChild(shelfEl);
+    // Event listener для закрытия по клику на overlay
+    document.getElementById('searchModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
         }
+    });
+}
 
-        const addShelfBtn = document.createElement('button');
-        addShelfBtn.textContent = 'Добавить полку';
-        addShelfBtn.addEventListener('click', () => {
-            const shelfName = prompt('Как назвать полку?');
-            if (shelfName && shelfName.trim()) {
-                if (!shelvingsData[shelvingName][shelfName.trim()]) {
-                    shelvingsData[shelvingName][shelfName.trim()] = true;
-                    localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
-                    const shelfEl = createShelfElement(shelvingName, shelfName.trim());
-                    shelvesContainer.appendChild(shelfEl);
-                }
+// Функция закрытия модального
+function closeModal() {
+    document.getElementById('searchModal').style.display = 'none';
+}
+
+// Event listeners (добавляются после загрузки DOM)
+document.addEventListener('DOMContentLoaded', function() {
+    const searchBtn = document.getElementById('searchBtn');
+    const searchInput = document.getElementById('searchInput');
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function() {
+            const itemName = searchInput.value;
+            searchItem(itemName);
+        });
+    }
+
+    // Опционально: поиск по Enter в input
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchItem(this.value);
             }
         });
-        shelvesContainer.appendChild(addShelfBtn);
     }
-}
 
-// Функция для показа подтверждения (предполагаю, что она у тебя есть; если нет, добавь)
-function showConfirm(message, onConfirm, onCancel) {
-    if (confirm(message)) {
-        onConfirm();
-    } else {
-        onCancel();
-    }
-}
-
-// Обработчик для добавления стеллажа
-document.getElementById('addShelvingBtn').addEventListener('click', () => {
-    const shelvingName = prompt('Как назвать стеллаж?');
-    if (shelvingName && shelvingName.trim()) {
-        if (!shelvingsData[shelvingName.trim()]) {
-            shelvingsData[shelvingName.trim()] = {};
-            localStorage.setItem('shelvings', JSON.stringify(shelvingsData));
-            loadData();
-        }
-    }
+    // Загружаем склад при старте
+    loadWarehouse();
 });
-
-// Загрузка данных при старте
-loadData();

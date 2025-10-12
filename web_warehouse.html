@@ -7,10 +7,29 @@
     <link rel="stylesheet" href="css/style.css">  <!-- Подключаем CSS -->
 </head>
 <body>
-    <h1>ЧИ ШОООО! СТЕЛЛАЖИИИИ?</h1>
-    <button id="addShelvingBtn">Добавить стеллаж</button>
-    <div id="shelvingsContainer"></div>
+    <header>
+        <h1>ЧИ ШОООО! СТЕЛЛАЖИИИИ?</h1>
+    </header>
+    
+    <main>
 
-    <script src="js/index.js"></script>  <!-- Подключаем JS из папки js -->
+        <div id="spare"></div>
+
+        <div id="warehouse-container">
+            <!-- Здесь JS добавит кнопку и контейнер стеллажей -->
+        </div>
+
+        <div id="search">
+            <input type="text" id="searchInput" placeholder="Введите название предмета">
+            <button id="searchBtn">Поиск</button>
+        </div>
+
+    </main>
+    
+    <footer>
+        <!-- Здесь можно добавить копирайт, ссылки или другие элементы -->
+    </footer>
+
+    <script src="js/index.js"></script>
 </body>
 </html>
