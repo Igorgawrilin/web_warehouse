@@ -1,15 +1,38 @@
-// Полный код JavaScript для складского приложения (js/script.js)
-// Включает весь функционал: управление складом (стеллажи → полки → предметы), LocalStorage, и исправленный поиск.
-// Теперь поиск собирает ВСЕ места, где найден предмет (если он есть на нескольких полках), и отображает их в модальном окне.
-// Если предмет не найден нигде, показывает сообщение "Предмет не найден".
-
 // Глобальные переменные
-let warehouseData = JSON.parse(localStorage.getItem('warehouse')) || { shelves: {} };
+let warehouseData = { shelves: {} }; // Инициализация по умолчанию
+let serverAvailable = false; // Флаг доступности сервера
 
-// Функция загрузки и отображения склада
-function loadWarehouse() {
+// Функция загрузки склада (с сервера, fallback на LocalStorage)
+async function loadWarehouse() {
+    try {
+        // Пытаемся загрузить с сервера
+        const response = await fetch('http://localhost:3000/warehouse');
+        if (response.ok) {
+            const data = await response.json();
+            warehouseData = { shelves: data.shelves || {} }; // Гарантируем, что shelves существует
+            serverAvailable = true;
+            localStorage.setItem('warehouse', JSON.stringify(warehouseData)); // Синхронизируем LocalStorage
+        } else {
+            throw new Error('Server response not ok');
+        }
+    } catch (error) {
+        console.warn('Server unavailable, using LocalStorage:', error);
+        serverAvailable = false;
+        const stored = localStorage.getItem('warehouse');
+        warehouseData = stored ? JSON.parse(stored) : { shelves: {} }; // Fallback с гарантией
+    }
+
+    // Отображаем склад
+    displayWarehouse();
+}
+
+// Функция отображения склада
+function displayWarehouse() {
     const container = document.getElementById('warehouse-container');
+    if (!container) return; // Проверка на существование контейнера
     container.innerHTML = ''; // Очищаем контейнер
+
+    if (!warehouseData.shelves) warehouseData.shelves = {}; // Дополнительная защита
 
     for (const shelfName in warehouseData.shelves) {
         const shelfDiv = document.createElement('div');
@@ -57,21 +80,33 @@ function loadWarehouse() {
     addShelfBtn.textContent = 'Добавить стеллаж';
     addShelfBtn.onclick = addShelf;
     container.appendChild(addShelfBtn);
-
-    saveWarehouse(); // Сохраняем после загрузки (на случай изменений)
 }
 
-// Функция сохранения в LocalStorage
-function saveWarehouse() {
-    localStorage.setItem('warehouse', JSON.stringify(warehouseData));
+// Функция сохранения (на сервер + LocalStorage)
+async function saveWarehouse() {
+    localStorage.setItem('warehouse', JSON.stringify(warehouseData)); // Всегда сохраняем локально
+
+    if (serverAvailable) {
+        try {
+            await fetch('http://localhost:3000/warehouse', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(warehouseData)
+            });
+        } catch (error) {
+            console.warn('Failed to save to server:', error);
+        }
+    }
 }
 
 // Функция добавления стеллажа
 function addShelf() {
     const name = prompt('Введите название стеллажа:');
     if (name && !warehouseData.shelves[name]) {
+        if (!warehouseData.shelves) warehouseData.shelves = {}; // Защита
         warehouseData.shelves[name] = { shelves: {} };
-        loadWarehouse();
+        displayWarehouse();
+        saveWarehouse();
     } else {
         alert('Стеллаж с таким именем уже существует или имя пустое.');
     }
@@ -80,17 +115,22 @@ function addShelf() {
 // Функция удаления стеллажа
 function deleteShelf(name) {
     if (confirm(`Удалить стеллаж "${name}" и всё его содержимое?`)) {
-        delete warehouseData.shelves[name];
-        loadWarehouse();
+        if (warehouseData.shelves && warehouseData.shelves[name]) {
+            delete warehouseData.shelves[name];
+            displayWarehouse();
+            saveWarehouse();
+        }
     }
 }
 
 // Функция добавления полки
 function addSubShelf(shelfName) {
     const name = prompt('Введите название полки:');
-    if (name && !warehouseData.shelves[shelfName].shelves[name]) {
+    if (name && warehouseData.shelves[shelfName] && !warehouseData.shelves[shelfName].shelves[name]) {
+        if (!warehouseData.shelves[shelfName].shelves) warehouseData.shelves[shelfName].shelves = {}; // Защита
         warehouseData.shelves[shelfName].shelves[name] = { items: {} };
-        loadWarehouse();
+        displayWarehouse();
+        saveWarehouse();
     } else {
         alert('Полка с таким именем уже существует или имя пустое.');
     }
@@ -99,8 +139,11 @@ function addSubShelf(shelfName) {
 // Функция удаления полки
 function deleteSubShelf(shelfName, subShelfName) {
     if (confirm(`Удалить полку "${subShelfName}" и всё её содержимое?`)) {
-        delete warehouseData.shelves[shelfName].shelves[subShelfName];
-        loadWarehouse();
+        if (warehouseData.shelves[shelfName] && warehouseData.shelves[shelfName].shelves[subShelfName]) {
+            delete warehouseData.shelves[shelfName].shelves[subShelfName];
+            displayWarehouse();
+            saveWarehouse();
+        }
     }
 }
 
@@ -109,9 +152,13 @@ function addItem(shelfName, subShelfName) {
     const name = prompt('Введите название предмета:');
     const quantity = parseInt(prompt('Введите количество:'), 10);
     if (name && quantity > 0 && !isNaN(quantity)) {
-        if (!warehouseData.shelves[shelfName].shelves[subShelfName].items[name]) {
-            warehouseData.shelves[shelfName].shelves[subShelfName].items[name] = quantity;
-            loadWarehouse();
+        const shelf = warehouseData.shelves[shelfName];
+        const subShelf = shelf && shelf.shelves[subShelfName];
+        if (subShelf && !subShelf.items[name]) {
+            if (!subShelf.items) subShelf.items = {}; // Защита
+            subShelf.items[name] = quantity;
+            displayWarehouse();
+            saveWarehouse();
         } else {
             alert('Предмет с таким именем уже существует.');
         }
@@ -122,10 +169,14 @@ function addItem(shelfName, subShelfName) {
 
 // Функция редактирования предмета
 function editItem(shelfName, subShelfName, itemName) {
-    const newQuantity = parseInt(prompt(`Введите новое количество для "${itemName}":`, warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName]), 10);
-    if (newQuantity > 0 && !isNaN(newQuantity)) {
-        warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName] = newQuantity;
-        loadWarehouse();
+    const shelf = warehouseData.shelves[shelfName];
+    const subShelf = shelf && shelf.shelves[subShelfName];
+    const currentQuantity = subShelf && subShelf.items[itemName];
+    const newQuantity = parseInt(prompt(`Введите новое количество для "${itemName}":`, currentQuantity || 0), 10);
+    if (newQuantity > 0 && !isNaN(newQuantity) && subShelf && subShelf.items) {
+        subShelf.items[itemName] = newQuantity;
+        displayWarehouse();
+        saveWarehouse();
     } else {
         alert('Неверное количество.');
     }
@@ -134,58 +185,57 @@ function editItem(shelfName, subShelfName, itemName) {
 // Функция удаления предмета
 function deleteItem(shelfName, subShelfName, itemName) {
     if (confirm(`Удалить предмет "${itemName}"?`)) {
-        delete warehouseData.shelves[shelfName].shelves[subShelfName].items[itemName];
-        loadWarehouse();
+        const shelf = warehouseData.shelves[shelfName];
+        const subShelf = shelf && shelf.shelves[subShelfName];
+        if (subShelf && subShelf.items && subShelf.items[itemName]) {
+            delete subShelf.items[itemName];
+            displayWarehouse();
+            saveWarehouse();
+        }
     }
 }
 
-// Функция поиска (исправленная: теперь находит ВСЕ места)
+// Функция поиска
 function searchItem(itemName) {
     if (!itemName.trim()) {
         alert('Введите название предмета!');
         return;
     }
 
-    let foundItems = []; // Массив для всех найденных предметов
+    let foundItems = [];
 
-    // Рекурсивный поиск по стеллажам → полкам → предметам (собираем все совпадения)
     function searchInShelves(obj, currentPath = '') {
+        if (!obj) return;
         for (const shelfName in obj) {
             if (obj[shelfName].items) {
-                // Это полка с предметами
                 for (const itemNameInData in obj[shelfName].items) {
-                    if (itemNameInData.toLowerCase().includes(itemName.toLowerCase())) { // Частичное совпадение, нечувствительное к регистру
+                    if (itemNameInData.toLowerCase().includes(itemName.toLowerCase())) {
                         foundItems.push({
                             name: itemNameInData,
                             quantity: obj[shelfName].items[itemNameInData],
                             location: currentPath + ' → ' + shelfName
                         });
-                        // НЕ останавливаем поиск — продолжаем искать все места
                     }
                 }
             } else if (obj[shelfName].shelves) {
-                // Это стеллаж с полками
                 const newPath = currentPath + (currentPath ? ' → ' : '') + shelfName;
-                searchInShelves(obj[shelfName].shelves, newPath); // Рекурсивно продолжаем
+                searchInShelves(obj[shelfName].shelves, newPath);
             }
         }
     }
 
-    // Запуск поиска (warehouseData.shelves — корень)
     if (warehouseData.shelves) {
         searchInShelves(warehouseData.shelves);
     }
 
     if (foundItems.length > 0) {
-        // Показываем модальное окно со списком всех найденных
         showModal(foundItems);
     } else {
-        // Не найден
         showModal('Предмет не найден', '', 'Проверьте название и попробуйте снова.');
     }
 }
 
-// Функция показа модального окна (обновленная: принимает массив или строку)
+// Функция показа модального окна
 function showModal(titleOrItems, quantity, location) {
     let modal = document.getElementById('searchModal');
     let modalTitle = document.getElementById('modalTitle');
@@ -193,20 +243,17 @@ function showModal(titleOrItems, quantity, location) {
     let modalCloseBtn = document.getElementById('modalCloseBtn');
 
     if (!modal) {
-        // Создаем модальное, если его нет
         createModal();
-        // После создания заново получаем ссылки на элементы
         modal = document.getElementById('searchModal');
         modalTitle = document.getElementById('modalTitle');
         modalContent = document.getElementById('modalContent');
         modalCloseBtn = document.getElementById('modalCloseBtn');
     }
 
-    modalTitle.textContent = ''; // Сброс
-    modalContent.innerHTML = ''; // Сброс
+    modalTitle.textContent = '';
+    modalContent.innerHTML = '';
 
     if (Array.isArray(titleOrItems)) {
-        // Массив найденных предметов
         modalTitle.textContent = 'Найденные предметы:';
         const ul = document.createElement('ul');
         titleOrItems.forEach(item => {
@@ -216,15 +263,14 @@ function showModal(titleOrItems, quantity, location) {
         });
         modalContent.appendChild(ul);
     } else {
-        // Сообщение об ошибке (строка)
         modalTitle.textContent = titleOrItems;
         modalContent.innerHTML = `<p>${location}</p>`;
     }
 
-    modal.style.display = 'block'; // Показываем
+    modal.style.display = 'block';
 }
 
-// Функция создания модального HTML (обновленная: добавлен div для контента)
+// Функция создания модального
 function createModal() {
     const modalHtml = `
         <div id="searchModal" class="modal">
@@ -235,9 +281,8 @@ function createModal() {
             </div>
         </div>
     `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml); // Добавляем в body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Event listener для закрытия по клику на overlay
     document.getElementById('searchModal').addEventListener('click', function(e) {
         if (e.target === this) {
             closeModal();
@@ -250,7 +295,7 @@ function closeModal() {
     document.getElementById('searchModal').style.display = 'none';
 }
 
-// Event listeners (добавляются после загрузки DOM)
+// Event listeners
 document.addEventListener('DOMContentLoaded', function() {
     const searchBtn = document.getElementById('searchBtn');
     const searchInput = document.getElementById('searchInput');
@@ -262,7 +307,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Опционально: поиск по Enter в input
     if (searchInput) {
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -273,4 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Загружаем склад при старте
     loadWarehouse();
+
+    // Автообновление каждые 5 секунд
+    setInterval(loadWarehouse, 5000);
 });
