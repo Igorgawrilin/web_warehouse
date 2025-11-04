@@ -572,11 +572,156 @@ function resetAssembly() {
     }
 }
 
+// Функция создания и открытия модального окна для экспорта/импорта
+function openExportModal() {
+    console.log('Создаём модальное окно для экспорта/импорта...'); // Отладка
+
+    // Создаём основной div модала
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'exportModal'; // Уникальный id, чтобы не конфликтовать с существующим modal
+    modal.style.display = 'block'; // Показываем сразу
+
+    // Создаём содержимое модала (modal-content)
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    // Заголовок
+    const title = document.createElement('h3');
+    title.textContent = 'Импорт и Экспорт';
+    modalContent.appendChild(title);
+
+    // Кнопка экспорта в файл
+    const exportFileBtn = document.createElement('button');
+    exportFileBtn.id = 'exportFileBtn';
+    exportFileBtn.textContent = 'Экспорт в файл';
+    modalContent.appendChild(exportFileBtn);
+
+    // Кнопка импорта из файла (с input для файла)
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'fileInput';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none'; // Скрываем, будем вызывать через кнопку
+    modalContent.appendChild(fileInput);
+
+    const importFileBtn = document.createElement('button');
+    importFileBtn.id = 'importFileBtn';
+    importFileBtn.textContent = 'Импорт из файла';
+    modalContent.appendChild(importFileBtn);
+
+    // Разделитель
+    modalContent.appendChild(document.createElement('br'));
+
+    // Textarea для JSON-строки
+    const jsonTextarea = document.createElement('textarea');
+    jsonTextarea.id = 'jsonTextarea';
+    jsonTextarea.placeholder = 'Вставьте JSON сюда для импорта';
+    jsonTextarea.rows = 10;
+    jsonTextarea.cols = 50;
+    modalContent.appendChild(jsonTextarea);
+
+    // Кнопка экспорта в строку
+    const exportStringBtn = document.createElement('button');
+    exportStringBtn.id = 'exportStringBtn';
+    exportStringBtn.textContent = 'Экспорт в строку';
+    modalContent.appendChild(exportStringBtn);
+
+    // Кнопка импорта из строки
+    const importStringBtn = document.createElement('button');
+    importStringBtn.id = 'importStringBtn';
+    importStringBtn.textContent = 'Импорт из строки';
+    modalContent.appendChild(importStringBtn);
+
+    // Сообщение статуса
+    const modalMessage = document.createElement('p');
+    modalMessage.id = 'modalMessage';
+    modalMessage.textContent = ''; // Изначально пустое
+    modalContent.appendChild(modalMessage);
+
+    // Добавляем modal-content в modal
+    modal.appendChild(modalContent);
+
+    // Добавляем модал в body (в конец)
+    document.body.appendChild(modal);
+
+    console.log('Модальное окно добавлено в DOM'); // Отладка
+
+    // Функции экспорта/импорта (с вашими данными, предполагаем warehouseData как глобальную переменную)
+    // Экспорт в файл
+    exportFileBtn.addEventListener('click', () => {
+        console.log('Экспорт в файл');
+        const dataStr = JSON.stringify(warehouseData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'warehouse_export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        modalMessage.textContent = 'Экспорт в файл завершён!';
+    });
+
+    // Импорт из файла
+    importFileBtn.addEventListener('click', () => {
+        fileInput.click(); // Открываем выбор файла
+    });
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    warehouseData = importedData; // Обновляем данные
+                    displayWarehouse(); // Обновляем интерфейс (ваша функция)
+                    saveWarehouse(); // Сохраняем на сервер (если есть)
+                    modalMessage.textContent = 'Импорт из файла завершён!';
+                } catch (error) {
+                    modalMessage.textContent = 'Ошибка: Неверный JSON-файл!';
+                }
+            };
+            reader.readAsText(file);
+        }
+    });
+
+    // Экспорт в строку (вставляем в textarea)
+    exportStringBtn.addEventListener('click', () => {
+        console.log('Экспорт в строку');
+        jsonTextarea.value = JSON.stringify(warehouseData, null, 2);
+        modalMessage.textContent = 'Экспорт в строку завершён!';
+    });
+
+    // Импорт из строки (из textarea)
+    importStringBtn.addEventListener('click', () => {
+        console.log('Импорт из строки');
+        try {
+            const importedData = JSON.parse(jsonTextarea.value);
+            warehouseData = importedData; // Обновляем данные
+            displayWarehouse(); // Обновляем интерфейс
+            saveWarehouse(); // Сохраняем на сервер
+            modalMessage.textContent = 'Импорт из строки завершён!';
+        } catch (error) {
+            modalMessage.textContent = 'Ошибка: Неверный JSON!';
+        }
+    });
+
+    // Закрытие модала по клику вне modal-content
+    window.addEventListener('click', function closeModal(event) {
+        if (event.target === modal) {
+            console.log('Закрываем модал по клику вне содержимого');
+            modal.remove(); // Удаляем из DOM
+            window.removeEventListener('click', closeModal); // Убираем слушатель
+        }
+    });
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
     const searchBtn = document.getElementById('searchBtn');
     const searchInput = document.getElementById('searchInput');
     const assemblyBtn = document.getElementById('assemblyBtn');
+    const openModalBtn = document.getElementById('openExportModal'); // Кнопка в footer
 
     if (searchBtn) {
         searchBtn.addEventListener('click', function() {
@@ -595,6 +740,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (assemblyBtn) {
         assemblyBtn.addEventListener('click', openAssemblyModal);
+    }
+
+    if (openModalBtn) {
+        openModalBtn.addEventListener('click', openExportModal);
+        console.log('Слушатель для кнопки "Импорт и Экспорт" добавлен'); // Отладка
+    } else {
+        console.error('Кнопка "Импорт и Экспорт" не найдена! Проверьте HTML.');
     }
 
     loadWarehouse();
