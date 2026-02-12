@@ -1,43 +1,37 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Разрешить запросы из фронтенда
+app.use(cors());
 
-// Подключение к SQLite (файл warehouse.db в папке server)
-const db = new sqlite3.Database('./warehouse.db');
-
-// Создание таблицы (если не существует)
-db.run(`CREATE TABLE IF NOT EXISTS warehouse (id INTEGER PRIMARY KEY, data TEXT DEFAULT '{}')`);
-
-// Инициализация: если данных нет, создаём пустой склад
-db.get(`SELECT data FROM warehouse WHERE id = 1`, (err, row) => {
-    if (!row || !row.data) {
-        db.run(`INSERT INTO warehouse (id, data) VALUES (1, '{}')`);
-    }
+// Подключение через переменную окружения (берем из Supabase)
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // Нужно для Render/Supabase
 });
 
 // GET /warehouse — получить данные
-app.get('/warehouse', (req, res) => {
-    db.get(`SELECT data FROM warehouse WHERE id = 1`, (err, row) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        try {
-            res.json(JSON.parse(row.data || '{}'));
-        } catch (e) {
-            res.json({ shelves: {} }); // Fallback на пустой склад
-        }
-    });
+app.get('/warehouse', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM warehouse WHERE id = 1');
+        res.json(result.rows[0]?.data || {});
+    } catch (err) {
+        res.status(500).json({ error: 'Database error' });
+    }
 });
 
 // PUT /warehouse — обновить данные
-app.put('/warehouse', (req, res) => {
-    const data = JSON.stringify(req.body);
-    db.run(`UPDATE warehouse SET data = ? WHERE id = 1`, [data], function(err) {
-        if (err) return res.status(500).json({ error: 'Save error' });
+app.put('/warehouse', async (req, res) => {
+    try {
+        const data = req.body; // В Postgres JSON можно передавать как объект
+        await pool.query('UPDATE warehouse SET data = $1 WHERE id = 1', [data]);
         res.json({ message: 'Updated' });
-    });
+    } catch (err) {
+        res.status(500).json({ error: 'Save error' });
+    }
 });
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
