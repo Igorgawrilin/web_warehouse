@@ -829,3 +829,9 @@ async function loadFromServer() {
         alert(`Ошибка загрузки: ${err.message}`);
     }
 }
+document.addEventListener('DOMContentLoaded', () => {
+    // … ваш прежний код инициализации …
+
+    document.getElementById('saveServerBtn').addEventListener('click', saveToServer);
+    document.getElementById('loadServerBtn').addEventListener('click', loadFromServer);
+});
