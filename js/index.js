@@ -8,7 +8,7 @@ const API_URL = 'http://localhost:3000/warehouse';
 // Функция загрузки склада (с сервера, fallback на LocalStorage)
 async function loadWarehouse() {
     try {
-        const response = await fetch('http://localhost:3000/warehouse');
+        const response = await fetch('https://ritgnuinyzvyczevwcxx.supabase.co');
         if (response.ok) {
             const data = await response.json();
             warehouseData = { shelves: data.shelves || {} };
