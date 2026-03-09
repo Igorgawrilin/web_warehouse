@@ -3,12 +3,13 @@ let warehouseData = { shelves: {} };
 let serverAvailable = false;
 let assemblyList = []; // Массив {name, totalQuantity, locations: [{shelfName, subShelfName, takenQuantity}] }
 let currentAssemblyItems = []; // Глобальная для передачи данных в onclick (избегать JSON в HTML)
-const API_URL = 'http://localhost:3000/warehouse';
+const RENDER_BASE_URL = 'https://web-warehouse.onrender.com';   // <-- замените на ваш URL
+const WAREHOUSE_ENDPOINT = `${RENDER_BASE_URL}/api/warehouse`;
 
 // Функция загрузки склада (с сервера, fallback на LocalStorage)
 async function loadWarehouse() {
     try {
-        const response = await fetch('https://ritgnuinyzvyczevwcxx.supabase.co');
+        const response = await fetch('http://localhost:3000/warehouse');
         if (response.ok) {
             const data = await response.json();
             warehouseData = { shelves: data.shelves || {} };
@@ -750,58 +751,81 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Кнопка "Импорт и Экспорт" не найдена! Проверьте HTML.');
     }
 
-    //loadWarehouse();
-    //etInterval(loadWarehouse, 5000);
+    loadWarehouse();
+    setInterval(loadWarehouse, 5000);
 });
-
-// Функция для ОТПРАВКИ данных в базу (на кнопку "Сохранить")
-async function saveToDatabase() {
+/* --------------------------------------------------------------
+   СОХРАНЕНИЕ НА СЕРВЕРЕ
+-------------------------------------------------------------- */
+async function saveToServer() {
     try {
-        const response = await fetch(API_URL, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            // Отправляем твой объект, превращенный в строку
-            body: JSON.stringify(warehouseState) 
+        // 1️⃣ Формируем тело запроса
+        const payload = { warehouse: warehouseData };
+
+        // 2️⃣ Отправляем POST‑запрос
+        const response = await fetch(WAREHOUSE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Токен добавляется **на сервере** (Render‑environment variable),
+                // поэтому в клиенте его не передаём.
+            },
+            body: JSON.stringify(payload)
         });
 
-        if (response.ok) {
-            const result = await response.json();
-            alert('Склад успешно сохранен в облако!');
-        } else {
-            throw new Error('Ошибка сервера');
+        // 3️⃣ Проверяем статус
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Сервер вернул ${response.status}: ${err}`);
         }
+
+        // 4️⃣ Получаем подтверждение
+        const result = await response.json();
+        if (result.status !== 'ok') {
+            throw new Error('Не удалось сохранить данные на сервере');
+        }
+
+        // 5️⃣ Информируем пользователя
+        alert('✅ Данные успешно сохранены на сервере');
     } catch (err) {
-        console.error('Ошибка при сохранении:', err);
-        alert('Не удалось сохранить данные.');
+        console.error('❌ Ошибка сохранения на сервере:', err);
+        alert(`Ошибка сохранения: ${err.message}`);
     }
 }
 
-// Функция для ЗАГРУЗКИ данных из базы (на кнопку "Загрузить" или при старте)
-async function loadFromDatabase() {
+/* --------------------------------------------------------------
+   ЗАГРУЗКА ИЗ СЕРВЕРА
+-------------------------------------------------------------- */
+async function loadFromServer() {
     try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
+        const response = await fetch(WAREHOUSE_ENDPOINT, {
+            method: 'GET',
+            headers: {
+                // Токен добавляется на сервере, клиент его не видит.
+            }
+        });
 
-        if (data && Object.keys(data).length > 0) {
-            warehouseState = data; // Заменяем локальные данные данными из базы
-            renderWarehouse();    // Твоя функция, которая рисует HTML по объекту
-            console.log('Данные загружены из базы');
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Сервер вернул ${response.status}: ${err}`);
         }
+
+        const data = await response.json();          // ожидаем { warehouse: { … } }
+        if (!data.warehouse) {
+            throw new Error('Ответ сервера не содержит поля `warehouse`');
+        }
+
+        // 1️⃣ Обновляем глобальную переменную и localStorage
+        warehouseData = data.warehouse;
+        localStorage.setItem('warehouse', JSON.stringify(warehouseData));
+
+        // 2️⃣ Перерисовываем UI
+        displayWarehouse();
+        displayAssemblyList();
+
+        alert('✅ Данные успешно загружены с сервера');
     } catch (err) {
-        console.error('Ошибка при загрузке:', err);
+        console.error('❌ Ошибка загрузки с сервера:', err);
+        alert(`Ошибка загрузки: ${err.message}`);
     }
 }
-
-// --- ТВОЯ ЛОГИКА ОТРИСОВКИ ---
-
-function renderWarehouse() {
-    const container = document.getElementById('warehouse-container');
-    container.innerHTML = ''; // Очищаем старое
-
-    // Здесь должен быть твой цикл, который проходит по warehouseState.shelves
-    // и создает блоки <div class="shelf">...</div>
-    console.log('Отрисовка склада по данным:', warehouseState);
-}
-
-// Загружать данные автоматически при открытии страницы
-window.addEventListener('DOMContentLoaded', loadFromDatabase);

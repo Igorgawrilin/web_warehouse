@@ -1,56 +1,65 @@
+// server.js
+require('dotenv').config();                 // для чтения .env
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+// ---------- Supabase ----------
+const SUPABASE_URL = process.env.SUPABASE_URL;          // https://xxx.supabase.co
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // секретный ключ
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// ---------- Таблица ----------
+const TABLE_NAME = 'warehouse_state';   // создайте таблицу с колонками: id (uuid, primary), data (jsonb)
+
+// ---------- POST – сохранить ----------
+app.post('/api/warehouse', async (req, res) => {
+    const { warehouse } = req.body;
+    if (!warehouse) return res.status(400).json({ error: 'Нет данных' });
+
+    try {
+        // Вставляем/обновляем запись с фиксированным id = 'current'
+        const { data, error } = await supabase
+            .from(TABLE_NAME)
+            .upsert({ id: 'current', data: warehouse })
+            .eq('id', 'current');
+
+        if (error) throw error;
+        res.json({ status: 'ok' });
+    } catch (e) {
+        console.error('❌ Ошибка Supabase POST:', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
-// Инициализация базы: создаем таблицу, если её нет, и одну пустую запись
-async function initDB() {
+// ---------- GET – загрузить ----------
+app.get('/api/warehouse', async (req, res) => {
     try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS warehouse (
-                id SERIAL PRIMARY KEY,
-                data JSONB
-            );
-        `);
-        const res = await pool.query('SELECT * FROM warehouse WHERE id = 1');
-        if (res.rowCount === 0) {
-            await pool.query('INSERT INTO warehouse (id, data) VALUES (1, $1)', [{}]);
+        const { data, error } = await supabase
+            .from(TABLE_NAME)
+            .select('data')
+            .eq('id', 'current')
+            .single();
+
+        if (error) {
+            // Если записи ещё нет – возвращаем пустой объект
+            if (error.code === 'PGRST116') {
+                return res.json({ warehouse: { shelves: {} } });
+            }
+            throw error;
         }
-        console.log("База данных готова к работе");
-    } catch (err) {
-        console.error("Ошибка инициализации БД:", err);
-    }
-}
-initDB();
 
-// Получить данные
-app.get('/warehouse', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT data FROM warehouse WHERE id = 1');
-        res.json(result.rows[0]?.data || {});
-    } catch (err) {
-        res.status(500).json({ error: 'Ошибка БД' });
+        res.json({ warehouse: data.data });
+    } catch (e) {
+        console.error('❌ Ошибка Supabase GET:', e);
+        res.status(500).json({ error: e.message });
     }
 });
 
-// Сохранить данные
-app.put('/warehouse', async (req, res) => {
-    try {
-        const data = req.body;
-        await pool.query('UPDATE warehouse SET data = $1 WHERE id = 1', [data]);
-        res.json({ message: 'Данные сохранены' });
-    } catch (err) {
-        res.status(500).json({ error: 'Ошибка при сохранении' });
-    }
-});
-
+// ---------- Запуск ----------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server listening on ${PORT}`));
