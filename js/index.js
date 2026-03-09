@@ -757,36 +757,41 @@ document.addEventListener('DOMContentLoaded', function() {
 /* --------------------------------------------------------------
    СОХРАНЕНИЕ НА СЕРВЕРЕ
 -------------------------------------------------------------- */
-// Предположим, что объект склада хранится в переменной warehouseData
-async function saveToDatabase() {
-  try {
-    // Формируем payload
-    const payload = { warehouse: warehouseData };
+async function saveToServer() {
+    try {
+        // 1️⃣ Формируем тело запроса
+        const payload = { warehouse: warehouseData };
 
-    // Отправляем запрос
-    const response = await fetch(WAREHOUSE_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+        // 2️⃣ Отправляем POST‑запрос
+        const response = await fetch(WAREHOUSE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Токен добавляется **на сервере** (Render‑environment variable),
+                // поэтому в клиенте его не передаём.
+            },
+            body: JSON.stringify(payload)
+        });
 
-    // Проверяем статус
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+        // 3️⃣ Проверяем статус
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Сервер вернул ${response.status}: ${err}`);
+        }
+
+        // 4️⃣ Получаем подтверждение
+        const result = await response.json();
+        if (result.status !== 'ok') {
+            throw new Error('Не удалось сохранить данные на сервере');
+        }
+
+        // 5️⃣ Информируем пользователя
+        alert('✅ Данные успешно сохранены на сервере');
+    } catch (err) {
+        console.error('❌ Ошибка сохранения на сервере:', err);
+        alert(`Ошибка сохранения: ${err.message}`);
     }
-
-    const result = await response.json();
-    if (result.status !== 'ok') {
-      throw new Error('Server returned an error');
-    }
-
-    alert('✅ Сохранено');
-  } catch (err) {
-    console.error('Ошибка при сохранении:', err);
-    alert('❌ Ошибка при сохранении: ' + err.message);
-  }
 }
-
 
 /* --------------------------------------------------------------
    ЗАГРУЗКА ИЗ СЕРВЕРА
