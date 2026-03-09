@@ -9,7 +9,7 @@ const WAREHOUSE_ENDPOINT = `${RENDER_BASE_URL}/api/warehouse`;
 // Функция загрузки склада (с сервера, fallback на LocalStorage)
 async function loadWarehouse() {
     try {
-        const response = await fetch('http://localhost:3000/warehouse');
+        const response = await fetch('https://web-warehouse.onrender.com');
         if (response.ok) {
             const data = await response.json();
             warehouseData = { shelves: data.shelves || {} };
