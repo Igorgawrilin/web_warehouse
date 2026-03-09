@@ -3,6 +3,7 @@ let warehouseData = { shelves: {} };
 let serverAvailable = false;
 let assemblyList = []; // Массив {name, totalQuantity, locations: [{shelfName, subShelfName, takenQuantity}] }
 let currentAssemblyItems = []; // Глобальная для передачи данных в onclick (избегать JSON в HTML)
+const API_URL = 'http://localhost:3000/warehouse';
 
 // Функция загрузки склада (с сервера, fallback на LocalStorage)
 async function loadWarehouse() {
@@ -749,6 +750,58 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Кнопка "Импорт и Экспорт" не найдена! Проверьте HTML.');
     }
 
-    loadWarehouse();
-    setInterval(loadWarehouse, 5000);
+    //loadWarehouse();
+    //etInterval(loadWarehouse, 5000);
 });
+
+// Функция для ОТПРАВКИ данных в базу (на кнопку "Сохранить")
+async function saveToDatabase() {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            // Отправляем твой объект, превращенный в строку
+            body: JSON.stringify(warehouseState) 
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            alert('Склад успешно сохранен в облако!');
+        } else {
+            throw new Error('Ошибка сервера');
+        }
+    } catch (err) {
+        console.error('Ошибка при сохранении:', err);
+        alert('Не удалось сохранить данные.');
+    }
+}
+
+// Функция для ЗАГРУЗКИ данных из базы (на кнопку "Загрузить" или при старте)
+async function loadFromDatabase() {
+    try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+
+        if (data && Object.keys(data).length > 0) {
+            warehouseState = data; // Заменяем локальные данные данными из базы
+            renderWarehouse();    // Твоя функция, которая рисует HTML по объекту
+            console.log('Данные загружены из базы');
+        }
+    } catch (err) {
+        console.error('Ошибка при загрузке:', err);
+    }
+}
+
+// --- ТВОЯ ЛОГИКА ОТРИСОВКИ ---
+
+function renderWarehouse() {
+    const container = document.getElementById('warehouse-container');
+    container.innerHTML = ''; // Очищаем старое
+
+    // Здесь должен быть твой цикл, который проходит по warehouseState.shelves
+    // и создает блоки <div class="shelf">...</div>
+    console.log('Отрисовка склада по данным:', warehouseState);
+}
+
+// Загружать данные автоматически при открытии страницы
+window.addEventListener('DOMContentLoaded', loadFromDatabase);
