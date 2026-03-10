@@ -9,8 +9,8 @@ app.use(cors());
 app.use(express.json());
 
 // ---------- Supabase ----------
-const SUPABASE_URL = process.env.SUPABASE_URL;          // https://xxx.supabase.co
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // секретный ключ
+const SUPABASE_URL = "https://ritgnuinyzvyczevwcxx.supabase.coSUPABASE_URL";          // https://xxx.supabase.co
+const SUPABASE_SERVICE_ROLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdGdudWlueXp2eWN6ZXZ3Y3h4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjYwODEsImV4cCI6MjA4NTcwMjA4MX0.s6hfcnEZxujPLbZproRW7nhlZmHwr7VVDafXIrvLfDY; // секретный ключ
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ---------- Таблица ----------
